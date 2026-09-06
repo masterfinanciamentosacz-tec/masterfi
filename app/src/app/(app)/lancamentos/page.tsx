@@ -1,0 +1,119 @@
+import { createClient } from "@/lib/supabase/server";
+import { formatBRL, formatDate } from "@/lib/format";
+import { CATEGORIA_LABEL, STATUS_LABEL, type Lancamento } from "@/lib/types";
+import { FiltersBar } from "./filters-bar";
+import { NewLancamentoButton } from "./new-lancamento-button";
+import { RowActions } from "./row-actions";
+
+type SearchParams = { [key: string]: string | string[] | undefined };
+
+const STATUS_STYLE: Record<string, string> = {
+  pendente: "bg-brand-yellow/15 text-brand-yellow",
+  pago: "bg-brand-lime/15 text-brand-lime",
+  recebido: "bg-brand-lime/15 text-brand-lime",
+  vencido: "bg-danger/15 text-danger",
+  cancelado: "bg-surface-2 text-muted",
+};
+
+export default async function LancamentosPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const sp = await searchParams;
+  const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
+  const filters = {
+    tipo: str("tipo"),
+    categoria: str("categoria"),
+    status: str("status"),
+    de: str("de"),
+    ate: str("ate"),
+    q: str("q"),
+  };
+
+  const supabase = await createClient();
+  let query = supabase.from("lancamentos").select("*").order("data_vencimento", { ascending: false });
+
+  if (filters.tipo) query = query.eq("tipo", filters.tipo);
+  if (filters.categoria) query = query.eq("categoria", filters.categoria);
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.de) query = query.gte("data_vencimento", filters.de);
+  if (filters.ate) query = query.lte("data_vencimento", filters.ate);
+  if (filters.q) query = query.or(`descricao.ilike.%${filters.q}%,cliente_fornecedor.ilike.%${filters.q}%`);
+
+  const { data, error } = await query;
+  const lancamentos = (data ?? []) as Lancamento[];
+
+  return (
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold">Lançamentos</h1>
+          <p className="text-sm text-muted">Todo dinheiro que entra ou sai deve ser registrado aqui.</p>
+        </div>
+        <NewLancamentoButton />
+      </div>
+
+      <FiltersBar initial={filters} />
+
+      {error && <p className="text-sm text-danger mb-4">Erro ao carregar dados: {error.message}</p>}
+
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted bg-surface-2/50 border-b border-border">
+                <th className="px-4 py-3 font-normal">Descrição</th>
+                <th className="px-4 py-3 font-normal">Categoria</th>
+                <th className="px-4 py-3 font-normal">Cliente/Fornecedor</th>
+                <th className="px-4 py-3 font-normal">Vencimento</th>
+                <th className="px-4 py-3 font-normal">Pagamento</th>
+                <th className="px-4 py-3 font-normal">Status</th>
+                <th className="px-4 py-3 font-normal text-right">Valor</th>
+                <th className="px-4 py-3 font-normal"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lancamentos.map((l) => (
+                <tr key={l.id} className="border-b border-border/60 last:border-0 hover:bg-surface-2/40">
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${
+                        l.tipo === "receita" ? "bg-brand-lime" : "bg-brand-orange"
+                      }`}
+                    />
+                    {l.descricao}
+                    {l.numero_nota && <span className="text-muted"> · NF {l.numero_nota}</span>}
+                  </td>
+                  <td className="px-4 py-3 text-muted">{CATEGORIA_LABEL[l.categoria]}</td>
+                  <td className="px-4 py-3 text-muted">{l.cliente_fornecedor ?? "—"}</td>
+                  <td className="px-4 py-3">{formatDate(l.data_vencimento)}</td>
+                  <td className="px-4 py-3 text-muted">{formatDate(l.data_pagamento)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_STYLE[l.status]}`}>
+                      {STATUS_LABEL[l.status]}
+                    </span>
+                  </td>
+                  <td className={`px-4 py-3 text-right font-medium ${l.tipo === "receita" ? "text-brand-lime" : "text-brand-orange"}`}>
+                    {l.tipo === "receita" ? "+" : "-"}
+                    {formatBRL(l.valor)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <RowActions lancamento={l} />
+                  </td>
+                </tr>
+              ))}
+              {lancamentos.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted">
+                    Nenhum lançamento encontrado com esses filtros.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
