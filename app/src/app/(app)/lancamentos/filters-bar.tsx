@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { CATEGORIA_LABEL, ENTIDADE_LABEL, STATUS_LABEL } from "@/lib/types";
 
@@ -10,6 +10,7 @@ export function FiltersBar({
   initial: { tipo: string; categoria: string; status: string; entidade: string; de: string; ate: string; q: string };
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [f, setF] = useState(initial);
 
   function apply() {
@@ -17,6 +18,8 @@ export function FiltersBar({
     Object.entries(f).forEach(([k, v]) => {
       if (v) params.set(k, v);
     });
+    const sort = searchParams.get("sort");
+    if (sort) params.set("sort", sort);
     router.push(`/lancamentos?${params.toString()}`);
   }
 

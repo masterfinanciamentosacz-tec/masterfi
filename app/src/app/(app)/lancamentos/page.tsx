@@ -4,6 +4,7 @@ import { CATEGORIA_LABEL, ENTIDADE_LABEL, STATUS_LABEL, type Lancamento } from "
 import { FiltersBar } from "./filters-bar";
 import { NewLancamentoButton } from "./new-lancamento-button";
 import { RowActions } from "./row-actions";
+import { SortableHeader } from "./sortable-header";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -18,6 +19,11 @@ const STATUS_STYLE: Record<string, string> = {
 const ENTIDADE_STYLE: Record<string, string> = {
   pf: "bg-brand-amber/15 text-brand-amber",
   pj: "bg-brand-lime/15 text-brand-lime",
+};
+
+const SORT_COLUMN: Record<string, string> = {
+  vencimento: "data_vencimento",
+  lancamento: "created_at",
 };
 
 export default async function LancamentosPage({
@@ -37,8 +43,15 @@ export default async function LancamentosPage({
     q: str("q"),
   };
 
+  const sort = str("sort") || "vencimento_desc";
+  const [sortField, sortDirection] = sort.split("_") as [string, "asc" | "desc"];
+  const sortColumn = SORT_COLUMN[sortField] ?? "data_vencimento";
+
   const supabase = await createClient();
-  let query = supabase.from("lancamentos").select("*").order("data_vencimento", { ascending: false });
+  let query = supabase
+    .from("lancamentos")
+    .select("*")
+    .order(sortColumn, { ascending: sortDirection === "asc" });
 
   if (filters.tipo) query = query.eq("tipo", filters.tipo);
   if (filters.categoria) query = query.eq("categoria", filters.categoria);
@@ -74,7 +87,12 @@ export default async function LancamentosPage({
                 <th className="px-4 py-3 font-normal">Origem</th>
                 <th className="px-4 py-3 font-normal">Categoria</th>
                 <th className="px-4 py-3 font-normal">Cliente/Fornecedor</th>
-                <th className="px-4 py-3 font-normal">Vencimento</th>
+                <th className="px-4 py-3 font-normal">
+                  <SortableHeader field="lancamento" label="Lançado em" currentSort={sort} />
+                </th>
+                <th className="px-4 py-3 font-normal">
+                  <SortableHeader field="vencimento" label="Vencimento" currentSort={sort} />
+                </th>
                 <th className="px-4 py-3 font-normal">Pagamento</th>
                 <th className="px-4 py-3 font-normal">Status</th>
                 <th className="px-4 py-3 font-normal text-right">Valor</th>
@@ -104,6 +122,7 @@ export default async function LancamentosPage({
                   </td>
                   <td className="px-4 py-3 text-muted">{CATEGORIA_LABEL[l.categoria]}</td>
                   <td className="px-4 py-3 text-muted">{l.cliente_fornecedor ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted">{formatDate(l.created_at.slice(0, 10))}</td>
                   <td className="px-4 py-3">{formatDate(l.data_vencimento)}</td>
                   <td className="px-4 py-3 text-muted">{formatDate(l.data_pagamento)}</td>
                   <td className="px-4 py-3">
@@ -122,7 +141,7 @@ export default async function LancamentosPage({
               ))}
               {lancamentos.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-muted">
+                  <td colSpan={10} className="px-4 py-8 text-center text-muted">
                     Nenhum lançamento encontrado com esses filtros.
                   </td>
                 </tr>
