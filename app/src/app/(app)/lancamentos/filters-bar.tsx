@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CATEGORIA_LABEL, STATUS_LABEL } from "@/lib/types";
+import { CATEGORIA_LABEL, ENTIDADE_LABEL, STATUS_LABEL } from "@/lib/types";
 
 export function FiltersBar({
   initial,
 }: {
-  initial: { tipo: string; categoria: string; status: string; de: string; ate: string; q: string };
+  initial: { tipo: string; categoria: string; status: string; entidade: string; de: string; ate: string; q: string };
 }) {
   const router = useRouter();
   const [f, setF] = useState(initial);
@@ -21,7 +21,7 @@ export function FiltersBar({
   }
 
   function clear() {
-    setF({ tipo: "", categoria: "", status: "", de: "", ate: "", q: "" });
+    setF({ tipo: "", categoria: "", status: "", entidade: "", de: "", ate: "", q: "" });
     router.push("/lancamentos");
   }
 
@@ -33,6 +33,18 @@ export function FiltersBar({
         onChange={(e) => setF({ ...f, q: e.target.value })}
         className="rounded-lg bg-surface-2 border border-border px-3 py-1.5 text-sm outline-none focus:border-brand-amber min-w-[200px] flex-1"
       />
+      <select
+        value={f.entidade}
+        onChange={(e) => setF({ ...f, entidade: e.target.value })}
+        className="rounded-lg bg-surface-2 border border-border px-3 py-1.5 text-sm outline-none focus:border-brand-amber"
+      >
+        <option value="">PF e PJ</option>
+        {Object.entries(ENTIDADE_LABEL).map(([k, v]) => (
+          <option key={k} value={k}>
+            {v}
+          </option>
+        ))}
+      </select>
       <select
         value={f.tipo}
         onChange={(e) => setF({ ...f, tipo: e.target.value })}

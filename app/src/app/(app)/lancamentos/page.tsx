@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatDate } from "@/lib/format";
-import { CATEGORIA_LABEL, STATUS_LABEL, type Lancamento } from "@/lib/types";
+import { CATEGORIA_LABEL, ENTIDADE_LABEL, STATUS_LABEL, type Lancamento } from "@/lib/types";
 import { FiltersBar } from "./filters-bar";
 import { NewLancamentoButton } from "./new-lancamento-button";
 import { RowActions } from "./row-actions";
@@ -15,6 +15,11 @@ const STATUS_STYLE: Record<string, string> = {
   cancelado: "bg-surface-2 text-muted",
 };
 
+const ENTIDADE_STYLE: Record<string, string> = {
+  pf: "bg-brand-amber/15 text-brand-amber",
+  pj: "bg-brand-lime/15 text-brand-lime",
+};
+
 export default async function LancamentosPage({
   searchParams,
 }: {
@@ -26,6 +31,7 @@ export default async function LancamentosPage({
     tipo: str("tipo"),
     categoria: str("categoria"),
     status: str("status"),
+    entidade: str("entidade"),
     de: str("de"),
     ate: str("ate"),
     q: str("q"),
@@ -37,6 +43,7 @@ export default async function LancamentosPage({
   if (filters.tipo) query = query.eq("tipo", filters.tipo);
   if (filters.categoria) query = query.eq("categoria", filters.categoria);
   if (filters.status) query = query.eq("status", filters.status);
+  if (filters.entidade) query = query.eq("entidade", filters.entidade);
   if (filters.de) query = query.gte("data_vencimento", filters.de);
   if (filters.ate) query = query.lte("data_vencimento", filters.ate);
   if (filters.q) query = query.or(`descricao.ilike.%${filters.q}%,cliente_fornecedor.ilike.%${filters.q}%`);
@@ -64,6 +71,7 @@ export default async function LancamentosPage({
             <thead>
               <tr className="text-left text-muted bg-surface-2/50 border-b border-border">
                 <th className="px-4 py-3 font-normal">Descrição</th>
+                <th className="px-4 py-3 font-normal">Origem</th>
                 <th className="px-4 py-3 font-normal">Categoria</th>
                 <th className="px-4 py-3 font-normal">Cliente/Fornecedor</th>
                 <th className="px-4 py-3 font-normal">Vencimento</th>
@@ -84,6 +92,15 @@ export default async function LancamentosPage({
                     />
                     {l.descricao}
                     {l.numero_nota && <span className="text-muted"> · NF {l.numero_nota}</span>}
+                    {l.parcela_total && l.parcela_total > 1 && (
+                      <span className="text-muted"> · {l.parcela_atual}/{l.parcela_total}</span>
+                    )}
+                    {l.transferencia_par_id && <span className="text-muted"> · repasse</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${ENTIDADE_STYLE[l.entidade]}`}>
+                      {ENTIDADE_LABEL[l.entidade]}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-muted">{CATEGORIA_LABEL[l.categoria]}</td>
                   <td className="px-4 py-3 text-muted">{l.cliente_fornecedor ?? "—"}</td>
@@ -105,7 +122,7 @@ export default async function LancamentosPage({
               ))}
               {lancamentos.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted">
+                  <td colSpan={9} className="px-4 py-8 text-center text-muted">
                     Nenhum lançamento encontrado com esses filtros.
                   </td>
                 </tr>

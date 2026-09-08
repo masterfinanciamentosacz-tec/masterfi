@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL } from "@/lib/format";
-import type { Lancamento } from "@/lib/types";
+import type { Entidade, Lancamento } from "@/lib/types";
 import { KpiCard } from "./kpi-card";
 import { MonthlyChart } from "./monthly-chart";
 import { DashboardFilters } from "./filters";
+import { EntidadeTabs } from "./entidade-tabs";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -15,15 +16,23 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const de = typeof sp.de === "string" ? sp.de : "";
   const ate = typeof sp.ate === "string" ? sp.ate : "";
+  const vistaRaw = typeof sp.vista === "string" ? sp.vista : "todos";
+  const vista = (["pf", "pj"].includes(vistaRaw) ? vistaRaw : "todos") as "todos" | Entidade;
 
   const supabase = await createClient();
 
   let query = supabase.from("lancamentos").select("*").order("data_vencimento", { ascending: true });
   if (de) query = query.gte("data_vencimento", de);
   if (ate) query = query.lte("data_vencimento", ate);
+  if (vista !== "todos") query = query.eq("entidade", vista);
 
   const { data, error } = await query;
-  const lancamentos = (data ?? []) as Lancamento[];
+  const todos = (data ?? []) as Lancamento[];
+
+  // No consolidado ("todos"), repasses entre PF e PJ sao movimentacao interna e nao
+  // devem inflar os totais de recebido/pago (eles se anulam). Na visao PF ou PJ isolada,
+  // o repasse e dinheiro real entrando ou saindo daquele "bolso", entao conta normalmente.
+  const lancamentos = vista === "todos" ? todos.filter((l) => l.categoria !== "repasse_pf_pj") : todos;
 
   const totalRecebido = lancamentos
     .filter((l) => l.tipo === "receita" && l.status === "recebido")
@@ -39,6 +48,17 @@ export default async function DashboardPage({
     .reduce((s, l) => s + l.valor, 0);
   const vencidos = lancamentos.filter((l) => l.status === "vencido");
   const resultado = totalRecebido - totalPago;
+
+  // saldo liquido de repasses PF -> PJ (sempre calculado sobre a base toda, sem filtro de vista)
+  const { data: repasses } = await supabase
+    .from("lancamentos")
+    .select("entidade,tipo,status,valor")
+    .eq("categoria", "repasse_pf_pj");
+  const saldoPfParaPj = (repasses ?? []).reduce((s, r) => {
+    if (r.entidade === "pf" && r.tipo === "despesa" && r.status === "pago") return s + r.valor;
+    if (r.entidade === "pf" && r.tipo === "receita" && r.status === "recebido") return s - r.valor;
+    return s;
+  }, 0);
 
   // group by month for chart (last 6 months present in data)
   const byMonth = new Map<string, { receita: number; despesa: number }>();
@@ -57,13 +77,15 @@ export default async function DashboardPage({
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <div>
           <h1 className="text-xl font-semibold">Dashboard financeiro</h1>
           <p className="text-sm text-muted">Visão geral de entradas, saídas e resultado.</p>
         </div>
         <DashboardFilters de={de} ate={ate} />
       </div>
+
+      <EntidadeTabs vista={vista} />
 
       {error && (
         <p className="text-sm text-danger mb-4">
@@ -90,9 +112,17 @@ export default async function DashboardPage({
             {formatBRL(resultado)}
           </p>
           <p className="text-xs text-muted mt-1 mb-4">Recebido − Pago</p>
-          <div className="mt-auto pt-4 border-t border-border">
-            <p className="text-sm text-muted mb-1">Vencimentos em atraso</p>
-            <p className="text-2xl font-semibold text-danger">{vencidos.length}</p>
+          <div className="mt-auto pt-4 border-t border-border space-y-3">
+            <div>
+              <p className="text-sm text-muted mb-1">Vencimentos em atraso</p>
+              <p className="text-2xl font-semibold text-danger">{vencidos.length}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted mb-1">
+                {saldoPfParaPj >= 0 ? "PF já injetou na PJ (líquido)" : "PJ já devolveu à PF (líquido)"}
+              </p>
+              <p className="text-lg font-semibold text-brand-amber">{formatBRL(Math.abs(saldoPfParaPj))}</p>
+            </div>
           </div>
         </div>
       </div>

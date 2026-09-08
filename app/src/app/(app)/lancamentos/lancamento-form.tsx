@@ -2,8 +2,8 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { createLancamento, updateLancamento, type LancamentoFormState } from "./actions";
-import { CATEGORIA_LABEL } from "@/lib/types";
-import type { Lancamento } from "@/lib/types";
+import { CATEGORIA_LABEL, CATEGORIA_OPTIONS } from "@/lib/types";
+import type { Entidade, Lancamento } from "@/lib/types";
 import { todayISO } from "@/lib/format";
 
 const initialState: LancamentoFormState = { error: null };
@@ -12,6 +12,7 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
   const action = existing ? updateLancamento.bind(null, existing.id) : createLancamento;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [tipo, setTipo] = useState<"receita" | "despesa">(existing?.tipo ?? "receita");
+  const [entidade, setEntidade] = useState<Entidade>(existing?.entidade ?? "pj");
 
   useEffect(() => {
     if (state.ok && onDone) onDone();
@@ -46,6 +47,31 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
       <input type="hidden" name="tipo" value={tipo} />
 
       <div className="col-span-2">
+        <label className="block text-xs text-muted mb-1">Este lançamento é de qual "bolso"? *</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEntidade("pf")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium border transition ${
+              entidade === "pf" ? "bg-brand-yellow/15 border-brand-yellow text-brand-yellow" : "border-border text-muted"
+            }`}
+          >
+            Pessoa Física
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntidade("pj")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium border transition ${
+              entidade === "pj" ? "bg-brand-yellow/15 border-brand-yellow text-brand-yellow" : "border-border text-muted"
+            }`}
+          >
+            Pessoa Jurídica
+          </button>
+        </div>
+        <input type="hidden" name="entidade" value={entidade} />
+      </div>
+
+      <div className="col-span-2">
         <label className="block text-xs text-muted mb-1">Descrição *</label>
         <input
           name="descricao"
@@ -63,16 +89,16 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
           defaultValue={existing?.categoria ?? "gasto_despesa"}
           className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-brand-amber"
         >
-          {Object.entries(CATEGORIA_LABEL).map(([k, v]) => (
+          {CATEGORIA_OPTIONS.map((k) => (
             <option key={k} value={k}>
-              {v}
+              {CATEGORIA_LABEL[k]}
             </option>
           ))}
         </select>
       </div>
 
       <div>
-        <label className="block text-xs text-muted mb-1">Valor (R$) *</label>
+        <label className="block text-xs text-muted mb-1">Valor por parcela (R$) *</label>
         <input
           name="valor"
           required
@@ -102,6 +128,23 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
         />
       </div>
 
+      {!existing && (
+        <div>
+          <label className="block text-xs text-muted mb-1">Número de parcelas</label>
+          <input
+            name="parcelas"
+            type="number"
+            min="1"
+            max="360"
+            defaultValue={1}
+            className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-brand-amber"
+          />
+          <p className="text-[11px] text-muted mt-1">
+            Se maior que 1, gera as parcelas seguintes automaticamente (mensal), a partir do vencimento abaixo.
+          </p>
+        </div>
+      )}
+
       <div>
         <label className="block text-xs text-muted mb-1">Data de emissão</label>
         <input
@@ -113,7 +156,9 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
       </div>
 
       <div>
-        <label className="block text-xs text-muted mb-1">Data de vencimento *</label>
+        <label className="block text-xs text-muted mb-1">
+          {existing?.parcela_total ? `Vencimento (parcela ${existing.parcela_atual}/${existing.parcela_total})` : "Data de vencimento *"}
+        </label>
         <input
           name="data_vencimento"
           type="date"
@@ -124,7 +169,7 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
       </div>
 
       <div>
-        <label className="block text-xs text-muted mb-1">Data de pagamento</label>
+        <label className="block text-xs text-muted mb-1">Data de pagamento{!existing ? " (1ª parcela)" : ""}</label>
         <input
           name="data_pagamento"
           type="date"
