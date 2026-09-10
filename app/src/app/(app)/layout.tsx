@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen flex">
       <aside className="w-60 shrink-0 border-r border-border bg-surface flex flex-col">
         <div className="px-5 py-6">
-          <Logo />
+          <Logo height={36} />
         </div>
         <nav className="flex-1 px-3 space-y-1">
           {NAV.map((item) => (
