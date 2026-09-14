@@ -8,6 +8,19 @@ import { EntidadeTabs } from "./entidade-tabs";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
+function buildLancamentosHref(
+  extra: Record<string, string>,
+  vista: "todos" | Entidade,
+  de: string,
+  ate: string
+) {
+  const params = new URLSearchParams(extra);
+  if (vista !== "todos") params.set("entidade", vista);
+  if (de) params.set("de", de);
+  if (ate) params.set("ate", ate);
+  return `/lancamentos?${params.toString()}`;
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -60,20 +73,25 @@ export default async function DashboardPage({
     return s;
   }, 0);
 
-  // group by month for chart (last 6 months present in data)
-  const byMonth = new Map<string, { receita: number; despesa: number }>();
+  // Ultimos 6 meses de calendario, terminando no filtro "ate" (ou hoje, se nao houver filtro).
+  // Usamos uma janela fixa de calendario (em vez de "ultimos 6 meses com dados") porque
+  // parcelamentos futuros ainda pendentes criavam meses "fantasma" la na frente e empurravam
+  // o mes atual pra fora do grafico.
+  const anchor = ate ? new Date(ate + "T00:00:00") : new Date();
+  const monthsWindow = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(anchor.getFullYear(), anchor.getMonth() - (5 - i), 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const byMonth = new Map(monthsWindow.map((mes) => [mes, { receita: 0, despesa: 0 }]));
   for (const l of lancamentos) {
-    const ref = l.data_pagamento ?? l.data_vencimento;
-    const key = ref.slice(0, 7); // YYYY-MM
-    const entry = byMonth.get(key) ?? { receita: 0, despesa: 0 };
+    if (!l.data_pagamento) continue;
+    const key = l.data_pagamento.slice(0, 7);
+    const entry = byMonth.get(key);
+    if (!entry) continue;
     if (l.tipo === "receita" && l.status === "recebido") entry.receita += l.valor;
     if (l.tipo === "despesa" && l.status === "pago") entry.despesa += l.valor;
-    byMonth.set(key, entry);
   }
-  const chartData = Array.from(byMonth.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-6)
-    .map(([mes, v]) => ({ mes, ...v }));
+  const chartData = monthsWindow.map((mes) => ({ mes, ...byMonth.get(mes)! }));
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -94,10 +112,30 @@ export default async function DashboardPage({
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Recebido" value={formatBRL(totalRecebido)} tone="lime" />
-        <KpiCard label="Pago" value={formatBRL(totalPago)} tone="orange" />
-        <KpiCard label="A receber" value={formatBRL(aReceber)} tone="yellow" />
-        <KpiCard label="A pagar" value={formatBRL(aPagar)} tone="amber" />
+        <KpiCard
+          label="Recebido"
+          value={formatBRL(totalRecebido)}
+          tone="lime"
+          href={buildLancamentosHref({ status: "recebido" }, vista, de, ate)}
+        />
+        <KpiCard
+          label="Pago"
+          value={formatBRL(totalPago)}
+          tone="orange"
+          href={buildLancamentosHref({ status: "pago" }, vista, de, ate)}
+        />
+        <KpiCard
+          label="A receber"
+          value={formatBRL(aReceber)}
+          tone="yellow"
+          href={buildLancamentosHref({ tipo: "receita", status_in: "pendente,vencido" }, vista, de, ate)}
+        />
+        <KpiCard
+          label="A pagar"
+          value={formatBRL(aPagar)}
+          tone="amber"
+          href={buildLancamentosHref({ tipo: "despesa", status_in: "pendente,vencido" }, vista, de, ate)}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">

@@ -53,9 +53,12 @@ export default async function LancamentosPage({
     .select("*")
     .order(sortColumn, { ascending: sortDirection === "asc" });
 
+  const statusIn = str("status_in");
+
   if (filters.tipo) query = query.eq("tipo", filters.tipo);
   if (filters.categoria) query = query.eq("categoria", filters.categoria);
-  if (filters.status) query = query.eq("status", filters.status);
+  if (statusIn) query = query.in("status", statusIn.split(","));
+  else if (filters.status) query = query.eq("status", filters.status);
   if (filters.entidade) query = query.eq("entidade", filters.entidade);
   if (filters.de) query = query.gte("data_vencimento", filters.de);
   if (filters.ate) query = query.lte("data_vencimento", filters.ate);
