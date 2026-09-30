@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatBRL } from "@/lib/format";
+import { addDaysISO, formatBRL, todayISO } from "@/lib/format";
 import type { Entidade, Lancamento } from "@/lib/types";
 import { KpiCard } from "./kpi-card";
 import { MonthlyChart } from "./monthly-chart";
 import { DashboardFilters } from "./filters";
 import { EntidadeTabs } from "./entidade-tabs";
+import { DueCard } from "./due-card";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -66,6 +67,13 @@ export default async function DashboardPage({
     .reduce((s, l) => s + l.valor, 0);
   const vencidos = lancamentos.filter((l) => l.status === "vencido");
   const resultado = totalRecebido - totalPago;
+
+  const hoje = todayISO();
+  const em5dias = addDaysISO(hoje, 5);
+  const vencendoHoje = lancamentos.filter((l) => l.status === "pendente" && l.data_vencimento === hoje);
+  const vencendoProx5 = lancamentos.filter(
+    (l) => l.status === "pendente" && l.data_vencimento > hoje && l.data_vencimento <= em5dias
+  );
 
   // saldo liquido de repasses PF -> PJ (sempre calculado sobre a base toda, sem filtro de vista)
   const { data: repasses } = await supabase
@@ -140,6 +148,27 @@ export default async function DashboardPage({
           value={formatBRL(aPagar)}
           tone="amber"
           href={buildLancamentosHref({ tipo: "despesa", status_in: "pendente,vencido" }, vista, de, ate)}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <DueCard
+          label="Vencido"
+          items={vencidos}
+          tone="danger"
+          href={buildLancamentosHref({ status: "vencido" }, vista, de, ate)}
+        />
+        <DueCard
+          label="Vencendo hoje"
+          items={vencendoHoje}
+          tone="yellow"
+          href={buildLancamentosHref({ status: "pendente" }, vista, hoje, hoje)}
+        />
+        <DueCard
+          label="Vencendo nos próximos 5 dias"
+          items={vencendoProx5}
+          tone="amber"
+          href={buildLancamentosHref({ status: "pendente" }, vista, addDaysISO(hoje, 1), em5dias)}
         />
       </div>
 
