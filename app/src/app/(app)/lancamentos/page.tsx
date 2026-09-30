@@ -117,6 +117,7 @@ export default async function LancamentosPage({
                       <span className="text-muted"> · {l.parcela_atual}/{l.parcela_total}</span>
                     )}
                     {l.transferencia_par_id && <span className="text-muted"> · repasse</span>}
+                    {l.caixinha_id && <span className="text-muted"> · poupança</span>}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs ${ENTIDADE_STYLE[l.entidade]}`}>

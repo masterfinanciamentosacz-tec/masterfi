@@ -89,7 +89,10 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
           defaultValue={existing?.categoria ?? "gasto_despesa"}
           className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-brand-amber"
         >
-          {CATEGORIA_OPTIONS.map((k) => (
+          {(existing && !CATEGORIA_OPTIONS.includes(existing.categoria)
+            ? [existing.categoria, ...CATEGORIA_OPTIONS]
+            : CATEGORIA_OPTIONS
+          ).map((k) => (
             <option key={k} value={k}>
               {CATEGORIA_LABEL[k]}
             </option>
