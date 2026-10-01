@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { depositar, resgatar, excluirCaixinha, type ActionState } from "./actions";
-import { ENTIDADE_LABEL, type Caixinha } from "@/lib/types";
+import { ENTIDADE_LABEL, type Caixinha, type Entidade } from "@/lib/types";
 import { formatBRL, todayISO } from "@/lib/format";
 
 const initialState: ActionState = { error: null };
@@ -19,6 +19,7 @@ function MovimentoForm({
 }) {
   const action = tipo === "deposito" ? depositar : resgatar;
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [entidade, setEntidade] = useState<Entidade>(caixinha.entidade);
 
   useEffect(() => {
     if (state.ok) onDone();
@@ -27,7 +28,33 @@ function MovimentoForm({
   return (
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="caixinha_id" value={caixinha.id} />
-      <input type="hidden" name="entidade" value={caixinha.entidade} />
+      <input type="hidden" name="entidade" value={entidade} />
+
+      <div>
+        <label className="block text-xs text-muted mb-1">
+          {tipo === "deposito" ? "De onde sai o dinheiro?" : "Para onde vai o dinheiro?"} *
+        </label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEntidade("pf")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium border transition ${
+              entidade === "pf" ? "bg-brand-yellow/15 border-brand-yellow text-brand-yellow" : "border-border text-muted"
+            }`}
+          >
+            Pessoa Física
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntidade("pj")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium border transition ${
+              entidade === "pj" ? "bg-brand-yellow/15 border-brand-yellow text-brand-yellow" : "border-border text-muted"
+            }`}
+          >
+            Pessoa Jurídica
+          </button>
+        </div>
+      </div>
 
       <div>
         <label className="block text-xs text-muted mb-1">Valor (R$) *</label>
