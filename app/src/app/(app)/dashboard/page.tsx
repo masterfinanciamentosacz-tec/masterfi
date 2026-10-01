@@ -46,12 +46,10 @@ export default async function DashboardPage({
   // No consolidado ("todos"), repasses entre PF e PJ sao movimentacao interna e nao
   // devem inflar os totais de recebido/pago (eles se anulam). Na visao PF ou PJ isolada,
   // o repasse e dinheiro real entrando ou saindo daquele "bolso", entao conta normalmente.
-  // Depositos/resgates de poupanca nunca contam como receita/despesa real (em nenhuma
-  // visao) - e so dinheiro do proprio dono mudando de lugar (caixa -> reserva).
-  const semPoupanca = todos.filter(
-    (l) => l.categoria !== "poupanca_deposito" && l.categoria !== "poupanca_resgate"
-  );
-  const lancamentos = vista === "todos" ? semPoupanca.filter((l) => l.categoria !== "repasse_pf_pj") : semPoupanca;
+  // Deposito/resgate de poupanca SEMPRE conta como despesa/receita normal: o dinheiro
+  // sai do caixa disponivel daquele "bolso" (PF ou PJ) e vai pra reserva, entao precisa
+  // reduzir o saldo normalmente, igual qualquer outro lancamento.
+  const lancamentos = vista === "todos" ? todos.filter((l) => l.categoria !== "repasse_pf_pj") : todos;
 
   const totalRecebido = lancamentos
     .filter((l) => l.tipo === "receita" && l.status === "recebido")
