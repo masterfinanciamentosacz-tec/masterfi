@@ -89,6 +89,39 @@ async function movimentarCaixinha(
   return { error: null, ok: true };
 }
 
+export async function registrarRendimento(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const caixinha_id = String(formData.get("caixinha_id") || "");
+  const valorRaw = String(formData.get("valor") || "0").replace(",", ".");
+  const valor = Number(valorRaw);
+  const data = String(formData.get("data") || "");
+  const observacoes = String(formData.get("observacoes") || "") || null;
+
+  if (!caixinha_id) return { error: "Caixinha inválida." };
+  if (!Number.isFinite(valor) || valor <= 0) return { error: "Valor inválido." };
+  if (!data) return { error: "Informe a data." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from("caixinha_rendimentos").insert({
+    caixinha_id,
+    valor,
+    data,
+    observacoes,
+    created_by: user?.id ?? null,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/poupanca");
+  return { error: null, ok: true };
+}
+
 export async function depositar(_prevState: ActionState, formData: FormData) {
   return movimentarCaixinha(formData, "despesa", "poupanca_deposito");
 }

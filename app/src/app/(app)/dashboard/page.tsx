@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { addDaysISO, formatBRL, todayISO } from "@/lib/format";
+import { addDaysISO, effectiveStatus, formatBRL, todayISO } from "@/lib/format";
 import type { Entidade, Lancamento } from "@/lib/types";
 import { KpiCard } from "./kpi-card";
 import { MonthlyChart } from "./monthly-chart";
@@ -40,8 +40,13 @@ export default async function DashboardPage({
   if (ate) query = query.lte("data_vencimento", ate);
   if (vista !== "todos") query = query.eq("entidade", vista);
 
+  const hoje = todayISO();
+
   const { data, error } = await query;
-  const todos = (data ?? []) as Lancamento[];
+  const todos = ((data ?? []) as Lancamento[]).map((l) => ({
+    ...l,
+    status: effectiveStatus(l.status, l.data_vencimento, hoje),
+  }));
 
   // No consolidado ("todos"), repasses entre PF e PJ sao movimentacao interna e nao
   // devem inflar os totais de recebido/pago (eles se anulam). Na visao PF ou PJ isolada,
@@ -66,7 +71,6 @@ export default async function DashboardPage({
   const vencidos = lancamentos.filter((l) => l.status === "vencido");
   const resultado = totalRecebido - totalPago;
 
-  const hoje = todayISO();
   const em5dias = addDaysISO(hoje, 5);
   const vencendoHoje = lancamentos.filter((l) => l.status === "pendente" && l.data_vencimento === hoje);
   const vencendoProx5 = lancamentos.filter(

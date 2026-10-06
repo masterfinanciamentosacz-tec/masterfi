@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatBRL, formatDate } from "@/lib/format";
+import { effectiveStatus, formatBRL, formatDate, todayISO } from "@/lib/format";
 import { CATEGORIA_LABEL, ENTIDADE_LABEL, STATUS_LABEL, type Lancamento } from "@/lib/types";
 import { FiltersBar } from "./filters-bar";
 import { NewLancamentoButton } from "./new-lancamento-button";
@@ -47,6 +47,7 @@ export default async function LancamentosPage({
   const [sortField, sortDirection] = sort.split("_") as [string, "asc" | "desc"];
   const sortColumn = SORT_COLUMN[sortField] ?? "data_vencimento";
 
+  const hoje = todayISO();
   const supabase = await createClient();
   let query = supabase
     .from("lancamentos")
@@ -57,7 +58,11 @@ export default async function LancamentosPage({
 
   if (filters.tipo) query = query.eq("tipo", filters.tipo);
   if (filters.categoria) query = query.eq("categoria", filters.categoria);
+  // "Vencido" e "Pendente" dependem da data de vencimento vs. hoje (o status gravado
+  // no banco so e atualizado quando a linha e salva).
   if (statusIn) query = query.in("status", statusIn.split(","));
+  else if (filters.status === "vencido") query = query.in("status", ["pendente", "vencido"]).lt("data_vencimento", hoje);
+  else if (filters.status === "pendente") query = query.in("status", ["pendente", "vencido"]).gte("data_vencimento", hoje);
   else if (filters.status) query = query.eq("status", filters.status);
   if (filters.entidade) query = query.eq("entidade", filters.entidade);
   if (filters.de) query = query.gte("data_vencimento", filters.de);
@@ -65,7 +70,10 @@ export default async function LancamentosPage({
   if (filters.q) query = query.or(`descricao.ilike.%${filters.q}%,cliente_fornecedor.ilike.%${filters.q}%`);
 
   const { data, error } = await query;
-  const lancamentos = (data ?? []) as Lancamento[];
+  const lancamentos = ((data ?? []) as Lancamento[]).map((l) => ({
+    ...l,
+    status: effectiveStatus(l.status, l.data_vencimento, hoje),
+  }));
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">

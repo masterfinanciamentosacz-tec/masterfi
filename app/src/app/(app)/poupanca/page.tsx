@@ -4,6 +4,8 @@ import type { Caixinha, Lancamento } from "@/lib/types";
 import { CaixinhaCard } from "./caixinha-card";
 import { NewCaixinhaButton } from "./new-caixinha-button";
 
+type Rendimento = { caixinha_id: string; valor: number; data: string };
+
 export default async function PoupancaPage() {
   const supabase = await createClient();
 
@@ -19,11 +21,19 @@ export default async function PoupancaPage() {
     .in("categoria", ["poupanca_deposito", "poupanca_resgate"]);
   const movimentos = (movsData ?? []) as Lancamento[];
 
+  const { data: rendData } = await supabase.from("caixinha_rendimentos").select("caixinha_id,valor,data");
+  const rendimentosList = (rendData ?? []) as Rendimento[];
+
   const saldoPorCaixinha = new Map<string, number>();
-  for (const c of caixinhas) saldoPorCaixinha.set(c.id, 0);
+  const rendimentoPorCaixinha = new Map<string, number>();
+  for (const c of caixinhas) {
+    saldoPorCaixinha.set(c.id, 0);
+    rendimentoPorCaixinha.set(c.id, 0);
+  }
   let totalGuardado = 0;
   let depositadoMes = 0;
   let resgatadoMes = 0;
+  let rendimentosMes = 0;
   const mesAtual = todayISO().slice(0, 7);
 
   for (const m of movimentos) {
@@ -41,6 +51,14 @@ export default async function PoupancaPage() {
     }
   }
 
+  for (const r of rendimentosList) {
+    if (!saldoPorCaixinha.has(r.caixinha_id)) continue;
+    saldoPorCaixinha.set(r.caixinha_id, (saldoPorCaixinha.get(r.caixinha_id) ?? 0) + r.valor);
+    rendimentoPorCaixinha.set(r.caixinha_id, (rendimentoPorCaixinha.get(r.caixinha_id) ?? 0) + r.valor);
+    totalGuardado += r.valor;
+    if (r.data.slice(0, 7) === mesAtual) rendimentosMes += r.valor;
+  }
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -54,7 +72,7 @@ export default async function PoupancaPage() {
       {error && <p className="text-sm text-danger mb-4">Erro ao carregar dados: {error.message}</p>}
 
       {caixinhas.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-surface border border-border rounded-xl p-4">
             <p className="text-xs text-muted mb-1.5">Total guardado</p>
             <p className="text-xl font-semibold text-brand-lime">{formatBRL(totalGuardado)}</p>
@@ -62,6 +80,10 @@ export default async function PoupancaPage() {
           <div className="bg-surface border border-border rounded-xl p-4">
             <p className="text-xs text-muted mb-1.5">Depositado no mês</p>
             <p className="text-xl font-semibold text-brand-yellow">{formatBRL(depositadoMes)}</p>
+          </div>
+          <div className="bg-surface border border-border rounded-xl p-4">
+            <p className="text-xs text-muted mb-1.5">Rendimentos no mês</p>
+            <p className="text-xl font-semibold text-brand-lime">{formatBRL(rendimentosMes)}</p>
           </div>
           <div className="bg-surface border border-border rounded-xl p-4">
             <p className="text-xs text-muted mb-1.5">Resgatado no mês</p>
@@ -86,7 +108,12 @@ export default async function PoupancaPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {caixinhas.map((c) => (
-            <CaixinhaCard key={c.id} caixinha={c} saldo={saldoPorCaixinha.get(c.id) ?? 0} />
+            <CaixinhaCard
+              key={c.id}
+              caixinha={c}
+              saldo={saldoPorCaixinha.get(c.id) ?? 0}
+              rendimentos={rendimentoPorCaixinha.get(c.id) ?? 0}
+            />
           ))}
         </div>
       )}
