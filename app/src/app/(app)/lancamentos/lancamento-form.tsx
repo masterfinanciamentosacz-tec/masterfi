@@ -3,16 +3,37 @@
 import { useActionState, useEffect, useState } from "react";
 import { createLancamento, updateLancamento, type LancamentoFormState } from "./actions";
 import { CATEGORIA_LABEL, CATEGORIA_OPTIONS } from "@/lib/types";
-import type { Entidade, Lancamento } from "@/lib/types";
+import type { Caixinha, Entidade, Lancamento } from "@/lib/types";
+import { ENTIDADE_LABEL } from "@/lib/types";
 import { todayISO } from "@/lib/format";
 
 const initialState: LancamentoFormState = { error: null };
 
-export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; onDone?: () => void }) {
+export function LancamentoForm({
+  existing,
+  onDone,
+  caixinhas = [],
+}: {
+  existing?: Lancamento;
+  onDone?: () => void;
+  caixinhas?: Caixinha[];
+}) {
   const action = existing ? updateLancamento.bind(null, existing.id) : createLancamento;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [tipo, setTipo] = useState<"receita" | "despesa">(existing?.tipo ?? "receita");
   const [entidade, setEntidade] = useState<Entidade>(existing?.entidade ?? "pj");
+  const [poupar, setPoupar] = useState(false);
+  const [caixinhaId, setCaixinhaId] = useState("");
+
+  // Guardar na poupanca so existe ao criar uma saida (despesa)
+  const podePoupar = !existing && tipo === "despesa";
+  const guardando = podePoupar && poupar && caixinhas.length > 0;
+
+  function escolherCaixinha(id: string) {
+    setCaixinhaId(id);
+    const c = caixinhas.find((x) => x.id === id);
+    if (c) setEntidade(c.entidade);
+  }
 
   useEffect(() => {
     if (state.ok && onDone) onDone();
@@ -71,6 +92,49 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
         <input type="hidden" name="entidade" value={entidade} />
       </div>
 
+      {podePoupar && (
+        <div className="col-span-2 rounded-lg border border-border bg-surface-2/40 p-3">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={poupar}
+              onChange={(e) => setPoupar(e.target.checked)}
+              className="accent-[#f2cb05]"
+            />
+            Guardar esse valor na poupança
+          </label>
+
+          {poupar && caixinhas.length === 0 && (
+            <p className="text-xs text-muted mt-2">
+              Você ainda não tem nenhuma caixinha. Crie uma na aba Poupança e volte aqui.
+            </p>
+          )}
+
+          {poupar && caixinhas.length > 0 && (
+            <div className="mt-3">
+              <label className="block text-xs text-muted mb-1">Em qual caixinha? *</label>
+              <select
+                name="caixinha_id"
+                required
+                value={caixinhaId}
+                onChange={(e) => escolherCaixinha(e.target.value)}
+                className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-brand-amber"
+              >
+                <option value="">Selecione...</option>
+                {caixinhas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome} · {ENTIDADE_LABEL[c.entidade]}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted mt-1">
+                O valor sai do bolso escolhido acima e soma direto no saldo da caixinha.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="col-span-2">
         <label className="block text-xs text-muted mb-1">Descrição *</label>
         <input
@@ -81,27 +145,31 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
         />
       </div>
 
-      <div>
-        <label className="block text-xs text-muted mb-1">Categoria *</label>
-        <select
-          name="categoria"
-          required
-          defaultValue={existing?.categoria ?? "gasto_despesa"}
-          className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-brand-amber"
-        >
-          {(existing && !CATEGORIA_OPTIONS.includes(existing.categoria)
-            ? [existing.categoria, ...CATEGORIA_OPTIONS]
-            : CATEGORIA_OPTIONS
-          ).map((k) => (
-            <option key={k} value={k}>
-              {CATEGORIA_LABEL[k]}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!guardando && (
+        <div>
+          <label className="block text-xs text-muted mb-1">Categoria *</label>
+          <select
+            name="categoria"
+            required
+            defaultValue={existing?.categoria ?? "gasto_despesa"}
+            className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-brand-amber"
+          >
+            {(existing && !CATEGORIA_OPTIONS.includes(existing.categoria)
+              ? [existing.categoria, ...CATEGORIA_OPTIONS]
+              : CATEGORIA_OPTIONS
+            ).map((k) => (
+              <option key={k} value={k}>
+                {CATEGORIA_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
-        <label className="block text-xs text-muted mb-1">Valor por parcela (R$) *</label>
+        <label className="block text-xs text-muted mb-1">
+          {guardando ? "Valor (R$) *" : "Valor por parcela (R$) *"}
+        </label>
         <input
           name="valor"
           required
@@ -131,7 +199,7 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
         />
       </div>
 
-      {!existing && (
+      {!existing && !guardando && (
         <div>
           <label className="block text-xs text-muted mb-1">Número de parcelas</label>
           <input
@@ -172,7 +240,7 @@ export function LancamentoForm({ existing, onDone }: { existing?: Lancamento; on
       </div>
 
       <div>
-        <label className="block text-xs text-muted mb-1">Data de pagamento{!existing ? " (1ª parcela)" : ""}</label>
+        <label className="block text-xs text-muted mb-1">Data de pagamento{!existing && !guardando ? " (1ª parcela)" : ""}</label>
         <input
           name="data_pagamento"
           type="date"

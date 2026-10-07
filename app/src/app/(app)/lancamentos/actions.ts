@@ -82,6 +82,27 @@ export async function createLancamento(
 
   const { payload, parcelas } = parsed;
 
+  // "Guardar na poupanca": o lancamento vira um deposito ja efetivado naquela caixinha.
+  const caixinha_id = String(formData.get("caixinha_id") || "") || null;
+  if (caixinha_id) {
+    if (payload.tipo !== "despesa") {
+      return { error: "Só dá pra guardar na poupança a partir de uma saída." };
+    }
+    const { error } = await supabase.from("lancamentos").insert({
+      ...payload,
+      categoria: "poupanca_deposito",
+      caixinha_id,
+      data_pagamento: payload.data_pagamento ?? payload.data_vencimento,
+      created_by: user?.id ?? null,
+    });
+    if (error) return { error: error.message };
+
+    revalidatePath("/lancamentos");
+    revalidatePath("/dashboard");
+    revalidatePath("/poupanca");
+    return { error: null, ok: true };
+  }
+
   if (parcelas <= 1) {
     const { error } = await supabase.from("lancamentos").insert({
       ...payload,

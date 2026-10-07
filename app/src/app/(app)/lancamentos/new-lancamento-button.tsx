@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LancamentoForm } from "./lancamento-form";
 import { RepasseForm } from "./repasse-form";
+import type { Caixinha } from "@/lib/types";
 
-export function NewLancamentoButton() {
+export function NewLancamentoButton({ caixinhas = [] }: { caixinhas?: Caixinha[] }) {
   const [open, setOpen] = useState(false);
   const [aba, setAba] = useState<"lancamento" | "repasse">("lancamento");
   const router = useRouter();
@@ -55,6 +56,7 @@ export function NewLancamentoButton() {
 
             {aba === "lancamento" ? (
               <LancamentoForm
+                caixinhas={caixinhas}
                 onDone={() => {
                   close();
                   router.refresh();

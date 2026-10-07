@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { effectiveStatus, formatBRL, formatDate, todayISO } from "@/lib/format";
-import { CATEGORIA_LABEL, ENTIDADE_LABEL, STATUS_LABEL, type Lancamento } from "@/lib/types";
+import { CATEGORIA_LABEL, ENTIDADE_LABEL, STATUS_LABEL, type Caixinha, type Lancamento } from "@/lib/types";
 import { FiltersBar } from "./filters-bar";
 import { NewLancamentoButton } from "./new-lancamento-button";
 import { RowActions } from "./row-actions";
@@ -69,6 +69,12 @@ export default async function LancamentosPage({
   if (filters.ate) query = query.lte("data_vencimento", filters.ate);
   if (filters.q) query = query.or(`descricao.ilike.%${filters.q}%,cliente_fornecedor.ilike.%${filters.q}%`);
 
+  const { data: caixinhasData } = await supabase
+    .from("caixinhas")
+    .select("*")
+    .order("created_at", { ascending: true });
+  const caixinhas = (caixinhasData ?? []) as Caixinha[];
+
   const { data, error } = await query;
   const lancamentos = ((data ?? []) as Lancamento[]).map((l) => ({
     ...l,
@@ -82,7 +88,7 @@ export default async function LancamentosPage({
           <h1 className="text-xl font-semibold">Lançamentos</h1>
           <p className="text-sm text-muted">Todo dinheiro que entra ou sai deve ser registrado aqui.</p>
         </div>
-        <NewLancamentoButton />
+        <NewLancamentoButton caixinhas={caixinhas} />
       </div>
 
       <FiltersBar initial={filters} />
