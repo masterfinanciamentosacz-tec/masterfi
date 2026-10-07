@@ -18,6 +18,11 @@ create index if not exists idx_rendimentos_caixinha on public.caixinha_rendiment
 
 alter table public.caixinha_rendimentos enable row level security;
 
+drop policy if exists "rendimentos_select_all" on public.caixinha_rendimentos;
+drop policy if exists "rendimentos_insert_all" on public.caixinha_rendimentos;
+drop policy if exists "rendimentos_update_all" on public.caixinha_rendimentos;
+drop policy if exists "rendimentos_delete_all" on public.caixinha_rendimentos;
+
 create policy "rendimentos_select_all" on public.caixinha_rendimentos
   for select using (auth.role() = 'authenticated');
 create policy "rendimentos_insert_all" on public.caixinha_rendimentos
