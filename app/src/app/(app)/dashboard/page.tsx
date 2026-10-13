@@ -6,6 +6,7 @@ import { MonthlyChart } from "./monthly-chart";
 import { DashboardFilters } from "./filters";
 import { EntidadeTabs } from "./entidade-tabs";
 import { DueCard } from "./due-card";
+import { UpcomingPanels } from "./upcoming-panels";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -72,6 +73,11 @@ export default async function DashboardPage({
   const resultado = totalRecebido - totalPago;
 
   const em5dias = addDaysISO(hoje, 5);
+  const JANELA_DIAS = 30;
+  const limiteJanela = addDaysISO(hoje, JANELA_DIAS);
+  const proximos = lancamentos.filter(
+    (l) => (l.status === "pendente" || l.status === "vencido") && l.data_vencimento <= limiteJanela
+  );
   const vencendoHoje = lancamentos.filter((l) => l.status === "pendente" && l.data_vencimento === hoje);
   const vencendoProx5 = lancamentos.filter(
     (l) => l.status === "pendente" && l.data_vencimento > hoje && l.data_vencimento <= em5dias
@@ -158,19 +164,22 @@ export default async function DashboardPage({
           label="Vencido"
           items={vencidos}
           tone="danger"
-          href={buildLancamentosHref({ status: "vencido" }, vista, de, ate)}
+          hrefReceber={buildLancamentosHref({ status: "vencido", tipo: "receita" }, vista, de, ate)}
+          hrefPagar={buildLancamentosHref({ status: "vencido", tipo: "despesa" }, vista, de, ate)}
         />
         <DueCard
           label="Vencendo hoje"
           items={vencendoHoje}
           tone="yellow"
-          href={buildLancamentosHref({ status: "pendente" }, vista, hoje, hoje)}
+          hrefReceber={buildLancamentosHref({ status: "pendente", tipo: "receita" }, vista, hoje, hoje)}
+          hrefPagar={buildLancamentosHref({ status: "pendente", tipo: "despesa" }, vista, hoje, hoje)}
         />
         <DueCard
           label="Vencendo nos próximos 5 dias"
           items={vencendoProx5}
           tone="amber"
-          href={buildLancamentosHref({ status: "pendente" }, vista, addDaysISO(hoje, 1), em5dias)}
+          hrefReceber={buildLancamentosHref({ status: "pendente", tipo: "receita" }, vista, addDaysISO(hoje, 1), em5dias)}
+          hrefPagar={buildLancamentosHref({ status: "pendente", tipo: "despesa" }, vista, addDaysISO(hoje, 1), em5dias)}
         />
       </div>
 
@@ -201,53 +210,7 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl p-5">
-        <h2 className="text-sm font-medium mb-4 text-muted">Próximos vencimentos</h2>
-        <div className="overflow-x-auto scrollbar-thin">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted border-b border-border">
-                <th className="pb-2 font-normal">Descrição</th>
-                <th className="pb-2 font-normal">Tipo</th>
-                <th className="pb-2 font-normal">Vencimento</th>
-                <th className="pb-2 font-normal">Status</th>
-                <th className="pb-2 font-normal text-right">Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lancamentos
-                .filter((l) => !["pago", "recebido", "cancelado"].includes(l.status))
-                .slice(0, 8)
-                .map((l) => (
-                  <tr key={l.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-2.5">{l.descricao}</td>
-                    <td className="py-2.5 capitalize">{l.tipo}</td>
-                    <td className="py-2.5">{new Date(l.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}</td>
-                    <td className="py-2.5">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          l.status === "vencido"
-                            ? "bg-danger/15 text-danger"
-                            : "bg-brand-yellow/15 text-brand-yellow"
-                        }`}
-                      >
-                        {l.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-right">{formatBRL(l.valor)}</td>
-                  </tr>
-                ))}
-              {lancamentos.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-6 text-center text-muted">
-                    Nenhum lançamento encontrado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <UpcomingPanels items={proximos} hoje={hoje} dias={JANELA_DIAS} />
     </div>
   );
 }
