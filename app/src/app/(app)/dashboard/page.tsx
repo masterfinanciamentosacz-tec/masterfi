@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { addDaysISO, effectiveStatus, formatBRL, todayISO } from "@/lib/format";
+import { addDaysISO, effectiveStatus, formatBRL, formatSignedBRL, todayISO } from "@/lib/format";
 import type { Entidade, Lancamento } from "@/lib/types";
 import { KpiCard } from "./kpi-card";
 import { MonthlyChart } from "./monthly-chart";
@@ -71,6 +71,33 @@ export default async function DashboardPage({
     .reduce((s, l) => s + l.valor, 0);
   const vencidos = lancamentos.filter((l) => l.status === "vencido");
   const resultado = totalRecebido - totalPago;
+
+  // De onde vem o resultado: operacao (dia a dia) + poupanca + repasses entre PF e PJ.
+  const saldoDe = (rows: Lancamento[]) =>
+    rows.filter((l) => l.tipo === "receita" && l.status === "recebido").reduce((s, l) => s + l.valor, 0) -
+    rows.filter((l) => l.tipo === "despesa" && l.status === "pago").reduce((s, l) => s + l.valor, 0);
+  const ehPoupanca = (l: Lancamento) => l.categoria === "poupanca_deposito" || l.categoria === "poupanca_resgate";
+  const ehRepasse = (l: Lancamento) => l.categoria === "repasse_pf_pj";
+  const resultadoOperacao = saldoDe(lancamentos.filter((l) => !ehPoupanca(l) && !ehRepasse(l)));
+  const resultadoPoupanca = saldoDe(lancamentos.filter(ehPoupanca));
+  const resultadoRepasses = saldoDe(lancamentos.filter(ehRepasse));
+
+  let motivoResultado: string;
+  if (resultado >= 0) {
+    motivoResultado =
+      resultadoPoupanca < -0.005
+        ? `Positivo, mesmo depois de guardar ${formatBRL(-resultadoPoupanca)} na poupança.`
+        : "Positivo: entrou mais dinheiro do que saiu no período.";
+    if (resultadoRepasses > 0.005) {
+      motivoResultado += ` Inclui ${formatBRL(resultadoRepasses)} recebidos de repasse do outro bolso.`;
+    }
+  } else {
+    const partes: string[] = [];
+    if (resultadoOperacao < -0.005) partes.push(`as saídas superaram as entradas em ${formatBRL(-resultadoOperacao)}`);
+    if (resultadoPoupanca < -0.005) partes.push(`${formatBRL(-resultadoPoupanca)} foram guardados na poupança`);
+    if (resultadoRepasses < -0.005) partes.push(`${formatBRL(-resultadoRepasses)} foram repassados para o outro bolso`);
+    motivoResultado = `Negativo porque ${partes.join(" e ")}.`;
+  }
 
   const em5dias = addDaysISO(hoje, 5);
   const JANELA_DIAS = 30;
@@ -194,7 +221,34 @@ export default async function DashboardPage({
           <p className={`text-3xl font-semibold ${resultado >= 0 ? "text-brand-lime" : "text-danger"}`}>
             {formatBRL(resultado)}
           </p>
-          <p className="text-xs text-muted mt-1 mb-4">Recebido − Pago</p>
+          <p className="text-xs text-muted mt-1 mb-3">Recebido − Pago</p>
+
+          <p className="text-sm mb-3">{motivoResultado}</p>
+          <ul className="space-y-1.5 text-xs mb-4">
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-muted">Dia a dia (entradas − saídas)</span>
+              <span className={resultadoOperacao >= 0 ? "text-brand-lime" : "text-danger"}>
+                {formatSignedBRL(resultadoOperacao)}
+              </span>
+            </li>
+            {Math.abs(resultadoPoupanca) >= 0.005 && (
+              <li className="flex items-center justify-between gap-3">
+                <span className="text-muted">Poupança (resgates − depósitos)</span>
+                <span className={resultadoPoupanca >= 0 ? "text-brand-lime" : "text-danger"}>
+                  {formatSignedBRL(resultadoPoupanca)}
+                </span>
+              </li>
+            )}
+            {Math.abs(resultadoRepasses) >= 0.005 && (
+              <li className="flex items-center justify-between gap-3">
+                <span className="text-muted">Repasses PF ↔ PJ</span>
+                <span className={resultadoRepasses >= 0 ? "text-brand-lime" : "text-danger"}>
+                  {formatSignedBRL(resultadoRepasses)}
+                </span>
+              </li>
+            )}
+          </ul>
+
           <div className="mt-auto pt-4 border-t border-border space-y-3">
             <div>
               <p className="text-sm text-muted mb-1">Vencimentos em atraso</p>

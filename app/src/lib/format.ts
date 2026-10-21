@@ -4,6 +4,11 @@ export function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+export function formatSignedBRL(value: number) {
+  if (Math.abs(value) < 0.005) return formatBRL(0);
+  return `${value > 0 ? "+" : "−"}${formatBRL(Math.abs(value))}`;
+}
+
 export function formatDate(value: string | null) {
   if (!value) return "—";
   const [y, m, d] = value.split("-");
