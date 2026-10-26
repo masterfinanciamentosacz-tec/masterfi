@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export type NfeState = { error: string | null; ok?: boolean };
+export type NfeState = { error: string | null; ok?: boolean; values?: Record<string, string> };
+
+// Devolve o que o usuario digitou, para o formulario nao ficar em branco depois de um erro.
+function echo(formData: FormData): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of ["numero", "tomador", "data_emissao", "valor"]) out[k] = String(formData.get(k) || "");
+  return out;
+}
 
 type Parsed =
   | { ok: false; error: string }
@@ -30,11 +37,14 @@ async function anoCadastrado(ano: number) {
 
 export async function createNfe(_prev: NfeState, formData: FormData): Promise<NfeState> {
   const parsed = parseNfe(formData);
-  if (!parsed.ok) return { error: parsed.error };
+  if (!parsed.ok) return { error: parsed.error, values: echo(formData) };
 
   const ano = Number(parsed.data_emissao.slice(0, 4));
   if (!(await anoCadastrado(ano))) {
-    return { error: `O ano ${ano} ainda não está cadastrado. Use o botão "+ Ano" para definir o teto dele.` };
+    return {
+      error: `O ano ${ano} ainda não está cadastrado. Use o botão "+ Ano" para definir o teto dele.`,
+      values: echo(formData),
+    };
   }
 
   const supabase = await createClient();
@@ -49,7 +59,7 @@ export async function createNfe(_prev: NfeState, formData: FormData): Promise<Nf
     valor: parsed.valor,
     created_by: user?.id ?? null,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: error.message, values: echo(formData) };
 
   revalidatePath("/nfe");
   return { error: null, ok: true };
@@ -57,11 +67,14 @@ export async function createNfe(_prev: NfeState, formData: FormData): Promise<Nf
 
 export async function updateNfe(id: string, _prev: NfeState, formData: FormData): Promise<NfeState> {
   const parsed = parseNfe(formData);
-  if (!parsed.ok) return { error: parsed.error };
+  if (!parsed.ok) return { error: parsed.error, values: echo(formData) };
 
   const ano = Number(parsed.data_emissao.slice(0, 4));
   if (!(await anoCadastrado(ano))) {
-    return { error: `O ano ${ano} ainda não está cadastrado. Use o botão "+ Ano" para definir o teto dele.` };
+    return {
+      error: `O ano ${ano} ainda não está cadastrado. Use o botão "+ Ano" para definir o teto dele.`,
+      values: echo(formData),
+    };
   }
 
   const supabase = await createClient();

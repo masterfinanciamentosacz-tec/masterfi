@@ -47,7 +47,7 @@ function NfeForm({
     <form action={formAction} className="space-y-3">
       <div>
         <label className="block text-xs text-muted mb-1">Número da NFE</label>
-        <input name="numero" defaultValue={existing?.numero ?? ""} autoFocus className={inputCls} />
+        <input name="numero" defaultValue={state.values?.numero ?? existing?.numero ?? ""} autoFocus className={inputCls} />
       </div>
       <div>
         <label className="block text-xs text-muted mb-1">Tomador *</label>
@@ -55,7 +55,7 @@ function NfeForm({
           name="tomador"
           required
           placeholder="CNPJ/CPF - Nome"
-          defaultValue={existing?.tomador ?? ""}
+          defaultValue={state.values?.tomador ?? existing?.tomador ?? ""}
           className={inputCls}
         />
       </div>
@@ -66,7 +66,7 @@ function NfeForm({
             name="data_emissao"
             type="date"
             required
-            defaultValue={existing?.data_emissao ?? defaultDate}
+            defaultValue={state.values?.data_emissao ?? existing?.data_emissao ?? defaultDate}
             className={inputCls}
           />
         </div>
@@ -78,7 +78,7 @@ function NfeForm({
             step="0.01"
             min="0"
             required
-            defaultValue={existing?.valor}
+            defaultValue={state.values?.valor ?? existing?.valor}
             className={inputCls}
           />
         </div>
