@@ -89,3 +89,17 @@ export const ENTIDADE_LABEL: Record<Entidade, string> = {
   pf: "Pessoa Física",
   pj: "Pessoa Jurídica",
 };
+
+export type Nfe = {
+  id: string;
+  numero: string | null;
+  tomador: string;
+  data_emissao: string;
+  valor: number;
+  created_at: string;
+};
+
+export type NfeAno = {
+  ano: number;
+  teto: number;
+};
