@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatDate, todayISO } from "@/lib/format";
 import type { Nfe, NfeAno } from "@/lib/types";
 import { AnoTabs, EditarTetoButton, NfeRowActions, NovaNfeButton } from "./nfe-client";
+import { SortableHeader } from "../lancamentos/sortable-header";
 
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -39,6 +40,26 @@ export default async function NfePage({
     nfes = ((data ?? []) as Nfe[]).map((n) => ({ ...n, valor: Number(n.valor) }));
     nfesError = error?.message ?? null;
   }
+
+  // Ordenacao escolhida nos titulos das colunas (padrao: emissao, mais recente primeiro)
+  const sort = typeof sp.sort === "string" ? sp.sort : "emissao_desc";
+  const [campo, sentido] = sort.split("_") as [string, "asc" | "desc"];
+  const fator = sentido === "asc" ? 1 : -1;
+  const comparar = (a: Nfe, b: Nfe) => {
+    if (campo === "numero") {
+      // numero como numero (assim "10" vem depois de "09"); notas sem numero vao pro fim
+      const na = a.numero ? Number(a.numero) : NaN;
+      const nb = b.numero ? Number(b.numero) : NaN;
+      if (Number.isNaN(na) && Number.isNaN(nb)) return 0;
+      if (Number.isNaN(na)) return 1;
+      if (Number.isNaN(nb)) return -1;
+      return (na - nb) * fator;
+    }
+    if (campo === "tomador") return a.tomador.localeCompare(b.tomador, "pt-BR") * fator;
+    if (campo === "valor") return (a.valor - b.valor) * fator;
+    return a.data_emissao.localeCompare(b.data_emissao) * fator;
+  };
+  nfes = [...nfes].sort(comparar);
 
   // Links temporarios (1 hora) para abrir os PDFs guardados
   const pdfUrls = new Map<string, string>();
@@ -153,10 +174,20 @@ export default async function NfePage({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-muted bg-surface-2/50 border-b border-border">
-                    <th className="px-4 py-3 font-normal">Nº NFE</th>
-                    <th className="px-4 py-3 font-normal">Tomador</th>
-                    <th className="px-4 py-3 font-normal">Data de emissão</th>
-                    <th className="px-4 py-3 font-normal text-right">Valor</th>
+                    <th className="px-4 py-3 font-normal">
+                      <SortableHeader field="numero" label="Nº NFE" currentSort={sort} basePath="/nfe" />
+                    </th>
+                    <th className="px-4 py-3 font-normal">
+                      <SortableHeader field="tomador" label="Tomador" currentSort={sort} basePath="/nfe" />
+                    </th>
+                    <th className="px-4 py-3 font-normal">
+                      <SortableHeader field="emissao" label="Data de emissão" currentSort={sort} basePath="/nfe" />
+                    </th>
+                    <th className="px-4 py-3 font-normal">
+                      <div className="flex justify-end">
+                        <SortableHeader field="valor" label="Valor" currentSort={sort} basePath="/nfe" />
+                      </div>
+                    </th>
                     <th className="px-4 py-3 font-normal">Nota</th>
                     <th className="px-4 py-3 font-normal"></th>
                   </tr>

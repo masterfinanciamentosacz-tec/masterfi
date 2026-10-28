@@ -6,10 +6,12 @@ export function SortableHeader({
   field,
   label,
   currentSort,
+  basePath = "/lancamentos",
 }: {
   field: string;
   label: string;
   currentSort: string; // ex: "vencimento_desc"
+  basePath?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,7 +23,7 @@ export function SortableHeader({
   function toggle() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("sort", `${field}_${nextDirection}`);
-    router.push(`/lancamentos?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
 
   return (
