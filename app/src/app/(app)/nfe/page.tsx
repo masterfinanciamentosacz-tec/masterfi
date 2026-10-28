@@ -40,6 +40,14 @@ export default async function NfePage({
     nfesError = error?.message ?? null;
   }
 
+  // Links temporarios (1 hora) para abrir os PDFs guardados
+  const pdfUrls = new Map<string, string>();
+  const caminhos = nfes.map((n) => n.arquivo_path).filter((p): p is string => !!p);
+  if (caminhos.length > 0) {
+    const { data: assinadas } = await supabase.storage.from("notas-fiscais").createSignedUrls(caminhos, 3600);
+    for (const a of assinadas ?? []) if (a.path && a.signedUrl) pdfUrls.set(a.path, a.signedUrl);
+  }
+
   const emitido = nfes.reduce((s, n) => s + n.valor, 0);
   const teto = anoSel?.teto ?? 0;
   const restante = Math.max(teto - emitido, 0);
@@ -149,6 +157,7 @@ export default async function NfePage({
                     <th className="px-4 py-3 font-normal">Tomador</th>
                     <th className="px-4 py-3 font-normal">Data de emissão</th>
                     <th className="px-4 py-3 font-normal text-right">Valor</th>
+                    <th className="px-4 py-3 font-normal">Nota</th>
                     <th className="px-4 py-3 font-normal"></th>
                   </tr>
                 </thead>
@@ -156,9 +165,27 @@ export default async function NfePage({
                   {nfes.map((n) => (
                     <tr key={n.id} className="border-b border-border/60 last:border-0 hover:bg-surface-2/40">
                       <td className="px-4 py-3 text-muted">{n.numero ?? "—"}</td>
-                      <td className="px-4 py-3">{n.tomador}</td>
+                      <td className="px-4 py-3">
+                        {n.tomador}
+                        {n.descricao && <p className="text-xs text-muted mt-0.5">{n.descricao}</p>}
+                      </td>
                       <td className="px-4 py-3">{formatDate(n.data_emissao)}</td>
                       <td className="px-4 py-3 text-right font-medium text-brand-lime">{formatBRL(n.valor)}</td>
+                      <td className="px-4 py-3 text-xs whitespace-nowrap">
+                        {n.arquivo_path && pdfUrls.get(n.arquivo_path) ? (
+                          <a
+                            href={pdfUrls.get(n.arquivo_path)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-brand-yellow hover:underline"
+                          >
+                            Ver PDF
+                          </a>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                        {n.lancamento_id && <p className="text-brand-lime mt-0.5">Em contas a receber</p>}
+                      </td>
                       <td className="px-4 py-3">
                         <NfeRowActions nfe={n} />
                       </td>
@@ -166,7 +193,7 @@ export default async function NfePage({
                   ))}
                   {nfes.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-muted">
+                      <td colSpan={6} className="px-4 py-8 text-center text-muted">
                         Nenhuma NFE emitida em {anoSel.ano}.
                       </td>
                     </tr>

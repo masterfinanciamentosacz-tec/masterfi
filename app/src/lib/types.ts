@@ -96,6 +96,10 @@ export type Nfe = {
   tomador: string;
   data_emissao: string;
   valor: number;
+  chave_acesso: string | null;
+  descricao: string | null;
+  arquivo_path: string | null;
+  lancamento_id: string | null;
   created_at: string;
 };
 
